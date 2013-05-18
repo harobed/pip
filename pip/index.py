@@ -153,8 +153,7 @@ class PackageFinder(object):
         """
         return sorted(applicable_versions, key=self._link_sort_key, reverse=True)
 
-    def find_requirement(self, req, upgrade):
-
+    def find_requirement_info(self, req):
         def mkurl_pypi_url(url):
             loc = posixpath.join(url, url_name)
             # For maximum compatibility with easy_install, ensure the path
@@ -237,7 +236,10 @@ class PackageFinder(object):
                 logger.info("Ignoring link %s, version %s is a pre-release (use --pre to allow)." % (link, version))
                 continue
             applicable_versions.append((parsed_version, link, version))
-        applicable_versions = self._sort_versions(applicable_versions)
+        return self._sort_versions(applicable_versions)
+
+    def find_requirement(self, req, upgrade):
+        applicable_versions = self.find_requirement_info(req)
         existing_applicable = bool([link for parsed_version, link, version in applicable_versions if link is InfLink])
         if not upgrade and existing_applicable:
             if applicable_versions[0][1] is InfLink:

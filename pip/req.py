@@ -160,7 +160,7 @@ class InstallRequirement(object):
                 s += '->' + comes_from
         return s
 
-    def build_location(self, build_dir, unpack=True):
+    def build_location(self, build_dir, unpack=True, version=None):
         if self._temp_build_dir is not None:
             return self._temp_build_dir
         if self.req is None:
@@ -174,6 +174,10 @@ class InstallRequirement(object):
         # FIXME: Is there a better place to create the build_dir? (hg and bzr need this)
         if not os.path.exists(build_dir):
             _make_build_dir(build_dir)
+
+        if version:
+            name = name + '-' + version + '-cpython' + sys.version.split(' ')[0]
+
         return os.path.join(build_dir, name)
 
     def correct_build_location(self):
@@ -1053,24 +1057,19 @@ class RequirementSet(object):
                     ##build directory
 
                     # NB: This call can result in the creation of a temporary build directory
-                    location = req_to_install.build_location(self.build_dir, not self.is_download)
+                    applicable_versions = finder.find_requirement_info(req_to_install)
+                    if len(applicable_versions) > 0:
+                        version_to_install = applicable_versions[0][2]
+                    else:
+                        version_to_install = None
+
+                    location = req_to_install.build_location(self.build_dir, not self.is_download, version_to_install)
                     unpack = True
                     url = None
 
                     # If a checkout exists, it's unwise to keep going.
                     # Version inconsistencies are logged later, but do not fail the installation.
-                    if os.path.exists(os.path.join(location, 'setup.py')):
-                        msg = textwrap.dedent("""
-                          pip can't proceed with requirement '%s' due to a pre-existing build directory.
-                           location: %s
-                          This is likely due to a previous installation that failed.
-                          pip is being responsible and not assuming it can delete this.
-                          Please delete it and try again.
-                        """ % (req_to_install, location))
-                        e = PreviousBuildDirError(msg)
-                        logger.fatal(msg)
-                        raise e
-                    else:
+                    if not os.path.exists(os.path.join(location, 'setup.py')):
                         ## FIXME: this won't upgrade when there's an existing package unpacked in `location`
                         if req_to_install.url is None:
                             if not_found:
